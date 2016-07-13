@@ -1,64 +1,97 @@
-
-class sp_counted_base
-{
-private:
-    int use_count_;        // #shared
-    int weak_count_;       // #weak + (#shared != 0)
-	
-public:
-	sp_counted_base(): use_count_( 1 ), weak_count_( 1 )
-    {
-    }
-	
-}
-
+﻿
+template <class T>
 struct shared_count
 {
-	sp_counted_base * pi_;
-	
-	shared_count(): pi_(0) // nothrow
+	shared_count(T* p) : ptr(p), use_count(1), weak_count(1)
 	{
-		
 	}
-}
+	
+	void release()
+	{
+		if (--use_count == 0)
+		{
+			destroy();
+		}
+	}
+
+	void add_ref()
+	{
+		use_count++;
+	}
+
+	void destroy()
+	{
+		delete ptr;
+	}
+
+	void swap(shared_count* other)
+	{
+		std::swap(this->use_count, other->use_count);
+		std::swap(this->weak_count, other->weak_count);
+		std::swap(this->ptr, other->ptr);
+	}
+
+	int use_count;        // #shared 
+	int weak_count;       // #weak + (#shared != 0)
+	T* ptr;
+};
 
 template <class T>
 struct shared_ptr
 {
-	shared_ptr(T* object) 
-		: m_helper(object)
+	explicit shared_ptr(T* p) : ptr(p), counter(p)
 	{
 	}
-	
-	shared_ptr(const shared_ptr<T>& other)
+	/*
+	shared_ptr(shared_ptr p)
 	{
-		
+
+	}
+	*/
+
+	explicit shared_ptr(shared_ptr& p)
+	{
+		this->swap(p);
 	}
 	
-	shared_ptr<T> operator=(const shared_ptr<T>& other)
+	~shared_ptr()
 	{
-		
+		counter.release();
+	}
+
+	shared_ptr& operator=(shared_ptr const& other)
+	{
+		other.swap(*this);
+		return *this;
 	}
 	
-	T* get() { return px; }
+	void swap(shared_ptr& other)
+	{
+		std::swap(this->ptr, other.ptr);
+		counter.swap(other.counter);
+	}
+
+	T* operator-> () const
+	{
+		// BOOST_ASSERT(px != 0);
+		return ptr;
+	}
+	
+	T* get() 
+	{ 
+		return ptr;
+	}
+
 private:
 	
-	element_type * px;                 // contained pointer
-    shared_count pn;    // reference counter
-}
+	T* ptr;						// contained pointer
+    shared_count<T> counter;	// reference counter
+};
 
-struct SomeClass
+/*
+template<class T, class... Args>
+shared_ptr<T> make_shared(Args && ... args)
 {
-	SomeClass(int i) { someValue = i; }
-	void foo() { std::cout << "foo call" << std::endl; }
-	int someValue;
+	shared_ptr<T> ptr(;
 }
-
-main() 
-{
-	shared_ptr<SomeClass> ptr = new shared_ptr<SomeClass>(10);
-	ptr->foo();
-	
-	shared_ptr<SomeClass> otherPtr(ptr);
-	
-}
+*/
